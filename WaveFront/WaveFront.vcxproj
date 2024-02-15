@@ -153,12 +153,14 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="CoordSystem.cpp" />
+    <ClCompile Include="Matrix.cpp" />
     <ClCompile Include="ObjLoader.cpp" />
     <ClCompile Include="TestGLM.cpp" />
     <ClCompile Include="WindowMain.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CoordSystem.h" />
+    <ClInclude Include="Matrix.h" />
     <ClInclude Include="ObjLoader.h" />
     <ClInclude Include="TestGLM.h" />
   </ItemGroup>

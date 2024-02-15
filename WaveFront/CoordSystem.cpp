@@ -5,7 +5,7 @@ HomogeneousCoordinateStruct CoordSystem::ToGlobalCoords(HomogeneousCoordinateStr
 {
 	//return AddVectors((this->MultiplyMatByVector(GlobalTransformationMatrix,local)), Center);
 	HomogeneousCoordinateStruct cent = { Center.x, Center.y, Center.z, 1.0f };
-	return AddHomogeneousVectors((this->MultiplyMatByVector(GlobalTransformationMatrix, local)), cent);
+	return AddHomogeneousVectors((this->MultiplyMatByVector(*GlobalTransformationMatrix, local)), cent);
 }
 
 CoordSystem::CoordSystem(CoordinateStruct Translation)
@@ -14,10 +14,15 @@ CoordSystem::CoordSystem(CoordinateStruct Translation)
 	YAxis = { 0.0f, 1.0f, 0.0f };
 	ZAxis = { 0.0f, 0.0f, 1.0f };
 
-	GlobalTransformationMatrix = { XAxis.x, YAxis.x, ZAxis.x, Translation.x,
+	/*GlobalTransformationMatrix = { XAxis.x, YAxis.x, ZAxis.x, Translation.x,
 									XAxis.y, YAxis.y, ZAxis.y, Translation.y,
 									XAxis.z, YAxis.z, ZAxis.z, Translation.z,
-										0,		0,		 0,		 1 };
+										0,		0,		 0,		 1 };*/
+
+	GlobalTransformationMatrix = new _3DMATRIX( XAxis.x, YAxis.x, ZAxis.x, 0.0f,
+									XAxis.y, YAxis.y, ZAxis.y, 0.0f,
+									XAxis.z, YAxis.z, ZAxis.z, 0.0f,
+									Translation.x,	Translation.y, Translation.z, 1.0f );
 
 }
 
@@ -74,6 +79,46 @@ _3DMATRIX CoordSystem::MultiplyMatrixByMatrix(const _3DMATRIX& m1, const _3DMATR
 	return result;
 }
 
+_3DMATRIX CoordSystem::ColumnMatrixMultiply(const _3DMATRIX& m1, const _3DMATRIX& m2)
+{
+	_3DMATRIX result;
+
+	for (int i = 0; i < 4; i++) {
+		for (int j = 0; j < 4; j++) {
+			for (int k = 0; k < 4; k++)
+				result.m[i][j] += m1.m[k][j] * m2.m[i][k];
+		}
+	}
+	return result;
+}
+
+_3DMATRIX CoordSystem::RowMatrixMultiply(const _3DMATRIX& m1, const _3DMATRIX& m2)
+{
+	_3DMATRIX result = {0};
+
+	for (int i = 0; i < 4; i++) {
+		for (int j = 0; j < 4; j++) {
+			for (int k = 0; k < 4; k++)
+				result.m[i][j] += m1.m[i][k] * m2.m[k][j];
+		}
+	}
+	return result;
+}
+
+HomogeneousCoordinateStruct CoordSystem::ColumnMultMatVect(const _3DMATRIX& matrix, HomogeneousCoordinateStruct vector)
+{
+	HomogeneousCoordinateStruct t;
+	/*for(int i=0;i<4;i++){
+		for(int j=0;j<4;j++)
+			t[i] += p[j] * m.mat[j][i];
+	}*/
+	t.x = matrix.m[0][0] * vector.x + matrix.m[1][0] * vector.y + matrix.m[2][0] * vector.z + matrix.m[3][0] * vector.w;
+	t.y = matrix.m[0][1] * vector.x + matrix.m[1][1] * vector.y + matrix.m[2][1] * vector.z + matrix.m[3][1] * vector.w;
+	t.z = matrix.m[0][2] * vector.x + matrix.m[1][2] * vector.y + matrix.m[2][2] * vector.z + matrix.m[3][2] * vector.w;
+	t.w = matrix.m[0][3] * vector.x + matrix.m[1][3] * vector.y + matrix.m[2][3] * vector.z + matrix.m[3][3] * vector.w;
+	return t;
+}
+
 float CoordSystem::VectorLength(const CoordinateStruct& vector)
 {
 	return std::sqrt(vector.x * vector.x + vector.y * vector.y + vector.z * vector.z);
@@ -110,27 +155,40 @@ HomogeneousCoordinateStruct CoordSystem::TransformVector(HomogeneousCoordinateSt
 	SetScaleMatrix(scale);
 	SetRotationMatrixOptimized(angle, axis);
 	SetMovementMatrix(translation);
-	_3DMATRIX ModelMatrix = MultiplyMatrixByMatrix(MovementMatrix, MultiplyMatrixByMatrix(RotationMatrix, ScaleMatrix));
-	//HomogeneousCoordinateStruct res = MultiplyMatByVector(MovementMatrix , MultiplyMatByVector(RotationMatrix , MultiplyMatByVector(ScaleMatrix, originalVector)));
-	HomogeneousCoordinateStruct res = MultiplyMatByVector(ModelMatrix, originalVector);
+	//_3DMATRIX ModelMatrix = MultiplyMatrixByMatrix(MovementMatrix, MultiplyMatrixByMatrix(RotationMatrix, ScaleMatrix));
+	HomogeneousCoordinateStruct res; /*= MultiplyMatByVector(ModelMatrix, originalVector);*/
+	return res;
+}
+
+_3DMATRIX CoordSystem::TransformMatrix(_3DMATRIX originalMatrix, CoordinateStruct& scale, float angle, CoordinateStruct& axis, CoordinateStruct& translation)
+{
+	SetScaleMatrix(scale);
+	SetRotationMatrixOptimized(angle, axis);
+	SetMovementMatrix(translation);
+
+	/*_3DMATRIX ModelMatrix = MovementMatrix * RotationMatrix * ScaleMatrix;
+	_3DMATRIX res = ModelMatrix * originalMatrix;*/
+	
+	/*_3DMATRIX ModelMatrix = ScaleMatrix * RotationMatrix * MovementMatrix;
+	HomogeneousCoordinateStruct temp;
+
+	for (int i = 0; i < 4; i++)
+	{
+			temp *= ScaleMatrix;
+			temp *= RotationMatrix;
+			temp *= MovementMatrix;
+	}*/
+	_3DMATRIX res/* = originalMatrix * ModelMatrix*/;
 	return res;
 }
 
 void CoordSystem::SetCameraTransformationMatrix(CoordinateStruct& cameraGlobalCoord, CoordinateStruct& targetGlobalCoord, CoordinateStruct& cameraUpVect)
 {
-	CameraTransformationMatrix = GetViewMatrix(cameraGlobalCoord, targetGlobalCoord, cameraUpVect);
+	//row
+	//CameraTransformationMatrix = GetViewMatrix(cameraGlobalCoord, targetGlobalCoord, cameraUpVect);
 
-
-	//ZAxis = NormalizeVector(SubstractVectors(cameraGlobalCoord, targetGlobalCoord));
-	//XAxis = NormalizeVector(CrossProduct(cameraUpVect, ZAxis));
-	//YAxis = CrossProduct(ZAxis, XAxis);
-
-	//CameraTransformationMatrix = { XAxis.x, XAxis.y, XAxis.z, -(DotProduct(XAxis,cameraGlobalCoord)),
-	//								YAxis.x, YAxis.y, YAxis.z, -(DotProduct(YAxis,cameraGlobalCoord)),
-	//								ZAxis.x, ZAxis.y, ZAxis.z, -(DotProduct(ZAxis,cameraGlobalCoord)),
-	//									0,		0,		 0,		 1 };
-
-	/*ZAxis = (SubstractVectors(targetGlobalCoord, cameraGlobalCoord));
+	//column
+	ZAxis = (SubstractVectors(targetGlobalCoord, cameraGlobalCoord));
 	ZAxis = NormalizeVector(ZAxis);
 	XAxis = CrossProduct(ZAxis, cameraUpVect);
 	XAxis = NormalizeVector(XAxis);
@@ -139,12 +197,18 @@ void CoordSystem::SetCameraTransformationMatrix(CoordinateStruct& cameraGlobalCo
 
 	float sus1 = -(DotProduct(XAxis, cameraGlobalCoord));
 	float sus2 = -(DotProduct(YAxis, cameraGlobalCoord));
-	float sus3 = (DotProduct(ZAxis, cameraGlobalCoord));
+	float sus3 = -(DotProduct(ZAxis, cameraGlobalCoord));
 
-	CameraTransformationMatrix = { XAxis.x, XAxis.y, XAxis.z, sus1,
+	//Column
+	/*CameraTransformationMatrix = { XAxis.x, XAxis.y, XAxis.z, sus1,
 									YAxis.x, YAxis.y, YAxis.z, sus2,
-									-ZAxis.x, -ZAxis.y, -ZAxis.z, sus3,
+									ZAxis.x, ZAxis.y, ZAxis.z, sus3,
 										0,		0,		 0,		 1 };*/
+	//row
+	CameraTransformationMatrix = new _3DMATRIX( XAxis.x,		YAxis.x, ZAxis.x,	0,
+									XAxis.y,	YAxis.y, ZAxis.y,	0,
+									XAxis.z,	YAxis.z, ZAxis.z,	0,
+									sus1,		sus2,		sus3,		 1 );
 
 	/*vec<3, T, Q> const f(normalize(center - eye));
 	vec<3, T, Q> const s(normalize(cross(f, up)));
@@ -173,25 +237,16 @@ _3DMATRIX CoordSystem::GetViewMatrix(CoordinateStruct& Pos, CoordinateStruct& Ta
 	Look = Target;
 	Up = UpVect;
 
-	//Right = Up.Cross(Look);
 	Right = CrossProduct(Up, Look);
-	//Right.Normalize();
 	Right = NormalizeVector(Right);
 
-
-
 	// Keep camera's axes orthogonal to eachother
-	//Look.Normalize();
 	Look = NormalizeVector(Look);
 
-	//Up = Look.Cross(Right);
 	Up = CrossProduct(Look, Right);
-	//Up.Normalize();
 	Up = NormalizeVector(Up);
 
-	//Right = Up.Cross(Look);
 	Right = CrossProduct(Up, Look);
-	//Right.Normalize();
 	Right = NormalizeVector(Right);
 
 	CoordinateStruct R;
@@ -203,24 +258,16 @@ _3DMATRIX CoordSystem::GetViewMatrix(CoordinateStruct& Pos, CoordinateStruct& Ta
 	CoordinateStruct P;
 	P.x = Position.x; P.y = Position.y; P.z = Position.z;
 
-	//L.Normalize();
 	L = NormalizeVector(L);
 
-	//U = L.Cross(R);
 	U = CrossProduct(L, R);
-	//U.Normalize();
 	U = NormalizeVector(U);
 
-	//R = U.Cross(L);
 	R = CrossProduct(U, L);
-	//R.Normalize();
 	R = NormalizeVector(R);
 
-	//float X = -R.Dot(P);
 	float X = -DotProduct(R, P);
-	//float Y = -U.Dot(P);
 	float Y = -DotProduct(U, P);
-	//float Z = -L.Dot(P);
 	float Z = -DotProduct(L, P);
 
 	_3DMATRIX T;
@@ -235,7 +282,7 @@ _3DMATRIX CoordSystem::GetViewMatrix(CoordinateStruct& Pos, CoordinateStruct& Ta
 
 void CoordSystem::SetProjectionTransformationMatrix(float fov, float aspectRatio, float nearPlane, float farPlane)
 {
-	_3DMATRIX result;
+	_3DMATRIX* result;
 
 	float radianFov = (fov / 2.0f) * (M_PI / 180.0f);
 
@@ -244,21 +291,17 @@ void CoordSystem::SetProjectionTransformationMatrix(float fov, float aspectRatio
 	float rangeInv = 1.0f / (nearPlane - farPlane);
 
 
-
-	/*result = { 1.0f / (aspectRatio * tanHalfFov),	0,					0,						0,
-				0,									1.0f / tanHalfFov,	0,						0,
-				0,									0,					rangeInv* farPlane, (nearPlane * farPlane)* rangeInv,
-				0,									0,					-1,						0 };*/
-
-	/*result = { (1.0f / (aspectRatio * tanHalfFov)),	0,					0,													0,
-				0,									1.0f / tanHalfFov,	0,													0,
-				0,									0,					-(farPlane + nearPlane) / (farPlane - nearPlane),	-1,
-				0,									0,					-(2 * farPlane * nearPlane) / (farPlane - nearPlane),0 };*/
-
-	result = { (1.0f / (aspectRatio * tanHalfFov)),	0,					0,													0,
+	//row
+	result = new _3DMATRIX ( (1.0f / (aspectRatio * tanHalfFov)),	0,					0,													0,
 				0,									1.0f / tanHalfFov,	0,													0,
 				0,									0,					(farPlane) / (farPlane - nearPlane),				1,
-				0,									0,					-(farPlane * nearPlane) / (farPlane - nearPlane),	0 };
+				0,									0,					-(farPlane * nearPlane) / (farPlane - nearPlane),	0 );
+
+	////column
+	//result = { (1.0f / (aspectRatio * tanHalfFov)),	0,					0,													0,
+	//			0,									1.0f / tanHalfFov,	0,													0,
+	//			0,									0,					(farPlane) / (farPlane - nearPlane),		-(farPlane * nearPlane) / (farPlane - nearPlane),
+	//			0,									0,					1,	0 };
 
 	ProjectionTransformationMatrix = result;
 }
@@ -268,15 +311,18 @@ void CoordSystem::SetViewPortTransformationMatrix(float width, float height, flo
 	float halfWidth = width / 2.0f;
 	float halfHeight = height / 2.0f;
 
-	/*ViewPortTransformationMatrix = { halfWidth, 0, 0, x + halfWidth,
-										0, halfHeight, 0, halfHeight + y,
-										0, 0, (zMax - zMin), zMin,
-										0, 0, 0,	1 };*/
-	
-	ViewPortTransformationMatrix = { halfWidth,				0,					0,			0,
+
+	//row
+	ViewPortTransformationMatrix = new _3DMATRIX( halfWidth,				0,					0,			0,
 										0,				halfHeight,				0,			0,
 										0,					0,				(zMax - zMin),	0,
-										x + halfWidth, halfHeight + y,		 zMin,			1 };
+										x + halfWidth, halfHeight + y,		 zMin,			1 );
+
+	////column
+	//ViewPortTransformationMatrix = { halfWidth,				0,					0,			x + halfWidth,
+	//									0,				halfHeight,				0,			halfHeight + y,
+	//									0,					0,				(zMax - zMin),	zMin,
+	//									0,					0,					0,			1 };
 }
 
 
@@ -288,43 +334,43 @@ void CoordSystem::MoveSystem(CoordinateStruct vect)
 
 void CoordSystem::SetMovementMatrix(CoordinateStruct Translation)
 {
-	MovementMatrix = { 1, 0, 0, Translation.x,
+	MovementMatrix = new _3DMATRIX( 1, 0, 0, Translation.x,
 						0, 1, 0, Translation.y,
 						0, 0, 1, Translation.z,
-						0, 0, 0,	1 };
+						0, 0, 0,	1 );
 }
 
 void CoordSystem::SetScaleMatrix(CoordinateStruct Scale)
 {
-	ScaleMatrix = { Scale.x,	0,				0,		0,
+	ScaleMatrix = new _3DMATRIX( Scale.x,	0,				0,		0,
 						0,			Scale.y,		0,		0,
 						0,			0,			Scale.z,	0,
-						0,			0,				0,		1 };
+						0,			0,				0,		1 );
 }
 
 void CoordSystem::SetRotateXMatrix(float angle)
 {
-	RotateXMatrix = { 1,		0,			0,		0,
+	RotateXMatrix = new _3DMATRIX ( 1,		0,			0,		0,
 						0, cos(angle), -sin(angle), 0,
 						0, sin(angle),	cos(angle),	0,
-						0,		0,			0,		1 };
+						0,		0,			0,		1 );
 }
 
 void CoordSystem::SetRotateYMatrix(float angle)
 {
-	RotateYMatrix = { cos(angle),		0,			sin(angle),		0,
+	RotateYMatrix =  new _3DMATRIX( cos(angle),		0,			sin(angle),		0,
 						0,				1,				0,			0,
 						-sin(angle),	0,			cos(angle),		0,
-						0,				0,				0,			1 };
+						0,				0,				0,			1 );
 }
 
 void CoordSystem::SetRotateZMatrix(float radianAngle)
 {
 
-	RotateZMatrix = { cos(radianAngle),		-sin(radianAngle),0,0,
+	RotateZMatrix = new _3DMATRIX( cos(radianAngle),		-sin(radianAngle),0,0,
 						sin(radianAngle),		 cos(radianAngle),0,0,
 						0,					0,		1,0,
-						0,					0,		0,1 };
+						0,					0,		0,1 );
 }
 
 void CoordSystem::SetRotateMatrix(float angle, CoordinateStruct axis)
@@ -333,7 +379,7 @@ void CoordSystem::SetRotateMatrix(float angle, CoordinateStruct axis)
 	SetRotateYMatrix(angle);
 	SetRotateZMatrix(angle);
 
-	RotationMatrix = MultiplyMatrixByMatrix(MultiplyMatrixByMatrix(RotateXMatrix, RotateYMatrix), RotateZMatrix);
+	//RotationMatrix = MultiplyMatrixByMatrix(MultiplyMatrixByMatrix(RotateXMatrix, RotateYMatrix), RotateZMatrix);
 	// Нормализуем ось вращения
 	float axisLength = std::sqrt(axis.x * axis.x + axis.y * axis.y + axis.z * axis.z);
 	CoordinateStruct normalizedAxis = { axis.x / axisLength, axis.y / axisLength, axis.z / axisLength };
@@ -350,10 +396,10 @@ void CoordSystem::SetRotationMatrixOptimized(float angle, const CoordinateStruct
 	float v = axis.y;
 	float w = axis.z;
 
-	RotationMatrix = { rcos + u * u * (1 - rcos), w * rsin + v * u * (1 - rcos), -v * rsin + w * u * (1 - rcos), 0.0f,
+	RotationMatrix = new _3DMATRIX ( rcos + u * u * (1 - rcos), w * rsin + v * u * (1 - rcos), -v * rsin + w * u * (1 - rcos), 0.0f,
 					   -w * rsin + u * v * (1 - rcos), rcos + v * v * (1 - rcos), u * rsin + w * v * (1 - rcos), 0.0f,
 					   v * rsin + u * w * (1 - rcos), -u * rsin + v * w * (1 - rcos), rcos + w * w * (1 - rcos), 0.0f,
-					   0.0f, 0.0f, 0.0f, 1.0f };
+					   0.0f, 0.0f, 0.0f, 1.0f );
 
 	/*rcos = cos(phi);
 	rsin = sin(phi);

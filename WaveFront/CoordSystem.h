@@ -1,22 +1,22 @@
 #pragma once
 #include "ObjLoader.h"
-
-#define M_PI       3.14159265358979323846   // pi
-
+#include "Matrix.h"
 
 
-typedef struct _3DMATRIX {
-    union {
-        struct {
-            float        _11, _12, _13, _14;
-            float        _21, _22, _23, _24;
-            float        _31, _32, _33, _34;
-            float        _41, _42, _43, _44;
 
-        };
-        float m[4][4];
-    };
-}; 
+
+//typedef struct _3DMATRIX {
+//    union {
+//        struct {
+//            float        _11, _12, _13, _14;
+//            float        _21, _22, _23, _24;
+//            float        _31, _32, _33, _34;
+//            float        _41, _42, _43, _44;
+//
+//        };
+//        float m[4][4];
+//    };
+//}; 
 
 struct HomogeneousCoordinateStruct
 {
@@ -49,22 +49,22 @@ inline HomogeneousCoordinateStruct AddHomogeneousVectors(const HomogeneousCoordi
     return result;
 }
 
-inline _3DMATRIX operator*(_3DMATRIX const& m1, _3DMATRIX const& m2)
-{
-    _3DMATRIX result;
-
-    for (int i = 0; i < 4; i++) {
-        for (int j = 0; j < 4; j++) {
-            for (int k = 0; k < 4; k++)
-                result.m[i][j] += m1.m[i][k] * m2.m[k][j];
-        }
-    }
-    return result;
-}
+//inline _3DMATRIX operator*(_3DMATRIX const& m1, _3DMATRIX const& m2)
+//{
+//    _3DMATRIX result = {0};
+//
+//    for (int i = 0; i < 4; i++) {
+//        for (int j = 0; j < 4; j++) {
+//            for (int k = 0; k < 4; k++)
+//                result.m[i][j] += m1.m[i][k] * m2.m[k][j];
+//        }
+//    }
+//    return result;
+//}
 
 inline HomogeneousCoordinateStruct operator* (HomogeneousCoordinateStruct& p, const _3DMATRIX& m) 
 {
-    HomogeneousCoordinateStruct t;
+    HomogeneousCoordinateStruct t = {0};
     /*for(int i=0;i<4;i++){
         for(int j=0;j<4;j++)
             t[i] += p[j] * m.mat[j][i];
@@ -73,6 +73,11 @@ inline HomogeneousCoordinateStruct operator* (HomogeneousCoordinateStruct& p, co
     t.y = p.x * m.m[0][1] + p.y * m.m[1][1] + p.z * m.m[2][1] + p.w * m.m[3][1];
     t.z = p.x * m.m[0][2] + p.y * m.m[1][2] + p.z * m.m[2][2] + p.w * m.m[3][2];
     t.w = p.x * m.m[0][3] + p.y * m.m[1][3] + p.z * m.m[2][3] + p.w * m.m[3][3];
+
+    /*t.x = p.x * m.m[0][0] + p.y * m.m[0][1] + p.z * m.m[0][2] + p.w * m.m[0][3];
+    t.y = p.x * m.m[1][0] + p.y * m.m[1][1] + p.z * m.m[1][2] + p.w * m.m[1][3];
+    t.z = p.x * m.m[2][0] + p.y * m.m[2][1] + p.z * m.m[2][2] + p.w * m.m[2][3];
+    t.w = p.x * m.m[3][0] + p.y * m.m[3][1] + p.z * m.m[3][2] + p.w * m.m[3][3];*/
     return t;
 }
 
@@ -94,20 +99,20 @@ class CoordSystem
 
 
 public:
-    _3DMATRIX GlobalTransformationMatrix;
-    _3DMATRIX CameraTransformationMatrix;
-    _3DMATRIX ProjectionTransformationMatrix;
-    _3DMATRIX ViewPortTransformationMatrix;
+    _3DMATRIX* GlobalTransformationMatrix;
+    _3DMATRIX* CameraTransformationMatrix;
+    _3DMATRIX* ProjectionTransformationMatrix;
+    _3DMATRIX* ViewPortTransformationMatrix;
 
-    _3DMATRIX MovementMatrix;
+    _3DMATRIX* MovementMatrix;
 
-    _3DMATRIX ScaleMatrix;
+    _3DMATRIX* ScaleMatrix;
 
-    _3DMATRIX RotateXMatrix;
-    _3DMATRIX RotateYMatrix;
-    _3DMATRIX RotateZMatrix;
+    _3DMATRIX* RotateXMatrix;
+    _3DMATRIX* RotateYMatrix;
+    _3DMATRIX* RotateZMatrix;
 
-    _3DMATRIX RotationMatrix;
+    _3DMATRIX* RotationMatrix;
 
 
     HomogeneousCoordinateStruct ToGlobalCoords(HomogeneousCoordinateStruct local);
@@ -118,6 +123,10 @@ public:
     CoordinateStruct MultiplyVectors(CoordinateStruct& vector1, CoordinateStruct& vector2);
     HomogeneousCoordinateStruct MultiplyMatByVector(_3DMATRIX matrix, HomogeneousCoordinateStruct vector);
     _3DMATRIX MultiplyMatrixByMatrix(const _3DMATRIX& mat1, const _3DMATRIX& mat2);
+    _3DMATRIX ColumnMatrixMultiply(const _3DMATRIX& m1, const _3DMATRIX& m2);
+    _3DMATRIX RowMatrixMultiply(const _3DMATRIX& m1, const _3DMATRIX& m2);
+    HomogeneousCoordinateStruct ColumnMultMatVect(const _3DMATRIX& matrix, HomogeneousCoordinateStruct vector);
+
     float DotProduct(const CoordinateStruct& vector1, const CoordinateStruct& vector2);
     CoordinateStruct CrossProduct(const CoordinateStruct& vector1, const CoordinateStruct& vector2);
 
@@ -127,6 +136,8 @@ public:
     CoordinateStruct NormalizeVector(const CoordinateStruct& vector);
 
     HomogeneousCoordinateStruct TransformVector(HomogeneousCoordinateStruct& originalVector, CoordinateStruct& scale, float angle, CoordinateStruct& axis, CoordinateStruct& translation);
+    _3DMATRIX TransformMatrix(_3DMATRIX originalMatrix, CoordinateStruct& scale, float angle, CoordinateStruct& axis, CoordinateStruct& translation);
+
 
 
     void SetCameraTransformationMatrix(CoordinateStruct& cameraGlobalCoord, CoordinateStruct& targetGlobalCoord, CoordinateStruct& cameraUpVect);
